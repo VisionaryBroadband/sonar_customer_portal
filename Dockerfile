@@ -1,20 +1,22 @@
-FROM phusion/baseimage:0.11 as base
+FROM phusion/baseimage:focal-1.2.0 as base
 
 ENV LC_ALL C.UTF-8
 
+ARG PHP_VERSION=7.4
+
 RUN add-apt-repository ppa:ondrej/php \
- && add-apt-repository ppa:ondrej/nginx-mainline \
+ && add-apt-repository ppa:ondrej/nginx \
  && install_clean \
       gettext \
       nginx \
-      php7.4-fpm \
-      php7.4-bcmath \
-      php7.4-curl \
-      php7.4-gmp \
-      php7.4-mbstring \
-      php7.4-sqlite3 \
-      php7.4-zip \
-      php7.4-dom \
+      php${PHP_VERSION}-fpm \
+      php${PHP_VERSION}-bcmath \
+      php${PHP_VERSION}-curl \
+      php${PHP_VERSION}-gmp \
+      php${PHP_VERSION}-mbstring \
+      php${PHP_VERSION}-sqlite3 \
+      php${PHP_VERSION}-zip \
+      php${PHP_VERSION}-dom \
       unzip
 
 WORKDIR /var/www/html
