@@ -1,6 +1,6 @@
 To deploy new image:
 
-docker build -t sonar-customerportal .
-docker login # use seankndy user
-docker tag sonar-customerportal seankndy/sonarcustomerportal:stable
-docker push seankndy/sonarcustomerportal:stable
+docker buildx build \
+  --platform linux/amd64 \
+  -t seankndy/sonarcustomerportal:stable \
+  --push .

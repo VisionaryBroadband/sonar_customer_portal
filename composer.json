@@ -8,26 +8,25 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": ">=7.4",
+        "php": "^8.3",
         "ext-json": "*",
         "ext-bcmath": "*",
-        "laravel/framework": "^6.0",
-        "predis/predis": "^1.0",
-        "mariuzzo/laravel-js-localization": "dev-master",
-        "laravel/tinker": "^1.0",
-        "fideloper/proxy": "^4.0",
-        "doctrine/dbal": "^2.10",
+        "guzzlehttp/guzzle": "^7.8",
+        "laravel/framework": "^12.0",
+        "predis/predis": "^2.3",
+        "mariuzzo/laravel-js-localization": "^2.1",
+        "laravel/tinker": "^2.10",
         "stripe/stripe-php": "^7",
-        "gocardless/gocardless-pro": "^1.5",
-        "laravelcollective/html": "^6.0",
-        "paypal/rest-api-sdk-php": "^1.7",
-        "proengsoft/laravel-jsvalidation": "^4.5",
+        "gocardless/gocardless-pro": "^4.8",
+        "rdx/laravelcollective-html": "^6.10",
+        "paypal/paypal-server-sdk": "^2.4",
+        "proengsoft/laravel-jsvalidation": "^4.10",
         "inacho/php-credit-card-validator": "^1.0",
         "sonarsoftwareinc/customer_portal_framework": "dev-master",
-        "spatie/laravel-csp": "^2.6",
+        "spatie/laravel-csp": "^2.10.3",
         "gmostafa/php-graphql-client": "^1.13",
         "spatie/data-transfer-object": "^2.8",
-        "seankndy/fluent-sonar-api": "^2.0"
+        "seankndy/fluent-sonar-api": "^3.0"
     },
     "repositories": [
         {
@@ -36,10 +35,10 @@
         }
     ],
     "require-dev": {
-        "fzaninotto/faker": "~1.4",
-        "mockery/mockery": "0.9.*",
-        "phpunit/phpunit": "^7.0",
-        "filp/whoops": "~2.0"
+        "fakerphp/faker": "^1.23",
+        "mockery/mockery": "^1.6",
+        "phpunit/phpunit": "^11.0",
+        "filp/whoops": "^2.0"
     },
     "autoload": {
         "classmap": [

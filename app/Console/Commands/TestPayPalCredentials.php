@@ -5,10 +5,9 @@ namespace App\Console\Commands;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
-use PayPal\Api\OpenIdUserinfo;
-use PayPal\Api\Webhook;
-use PayPal\Auth\OAuthTokenCredential;
-use PayPal\Rest\ApiContext;
+use PaypalServerSdkLib\Authentication\ClientCredentialsAuthCredentialsBuilder;
+use PaypalServerSdkLib\Environment;
+use PaypalServerSdkLib\PaypalServerSdkClientBuilder;
 
 class TestPayPalCredentials extends Command
 {
@@ -47,23 +46,19 @@ class TestPayPalCredentials extends Command
             return;
         }
 
-        $apiContext = new ApiContext(
-            new OAuthTokenCredential(
-                config("customer_portal.paypal_api_client_id"),
-                config("customer_portal.paypal_api_client_secret")
+        $client = PaypalServerSdkClientBuilder::init()
+            ->clientCredentialsAuthCredentials(
+                ClientCredentialsAuthCredentialsBuilder::init(
+                    (string) config("customer_portal.paypal_api_client_id"),
+                    (string) config("customer_portal.paypal_api_client_secret")
+                )
             )
-        );
-
-        $apiContext->setConfig([
-            //You can set this to 'sandbox' if you want to test with a sandbox account
-            'mode' => 'live',
-            'log.LogEnabled' => true,
-            'log.FileName' => storage_path("logs/paypal.log"),
-            'log.LogLevel' => 'ERROR',
-        ]);
+            //You can set this to Environment::SANDBOX if you want to test with a sandbox account
+            ->environment(Environment::PRODUCTION)
+            ->build();
 
         try {
-            Webhook::getAll($apiContext);
+            $client->getClientCredentialsAuth()->fetchToken();
         } catch (Exception $e) {
             $this->error("Credentials failed! Please make sure this is a LIVE account and not a SANDBOX account and try again.");
             $this->error("Specific error was: {$e->getMessage()}");

@@ -60,6 +60,11 @@ class User implements Authenticatable
         return $this->{$this->getAuthIdentifierName()};
     }
 
+    public function getAuthPasswordName()
+    {
+        return 'password';
+    }
+
     public function getAuthPassword()
     {
         return null;

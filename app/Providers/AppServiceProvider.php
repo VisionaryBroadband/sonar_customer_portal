@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\LanguageService;
 use App\SystemSetting;
 use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -16,6 +17,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        Paginator::defaultView('pagination::default');
+        Paginator::defaultSimpleView('pagination::simple-default');
+
         try {
             $systemSetting = SystemSetting::instance();
 

@@ -11,21 +11,27 @@ use Illuminate\Http\Request;
 use App\Http\Requests;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
-use PayPal\Api\Amount;
-use PayPal\Api\Payer;
-use PayPal\Api\Payment;
-use PayPal\Api\PaymentExecution;
-use PayPal\Api\RedirectUrls;
-use PayPal\Api\Transaction;
-use PayPal\Auth\OAuthTokenCredential;
-use PayPal\Rest\ApiContext;
+use PaypalServerSdkLib\Authentication\ClientCredentialsAuthCredentialsBuilder;
+use PaypalServerSdkLib\Environment;
+use PaypalServerSdkLib\Models\Builders\AmountWithBreakdownBuilder;
+use PaypalServerSdkLib\Models\Builders\OrderRequestBuilder;
+use PaypalServerSdkLib\Models\Builders\PaymentSourceBuilder;
+use PaypalServerSdkLib\Models\Builders\PaypalWalletBuilder;
+use PaypalServerSdkLib\Models\Builders\PaypalWalletExperienceContextBuilder;
+use PaypalServerSdkLib\Models\Builders\PurchaseUnitRequestBuilder;
+use PaypalServerSdkLib\Models\CaptureStatus;
+use PaypalServerSdkLib\Models\CheckoutPaymentIntent;
+use PaypalServerSdkLib\Models\OrderStatus;
+use PaypalServerSdkLib\Models\PaypalExperienceUserAction;
+use PaypalServerSdkLib\PaypalServerSdkClient;
+use PaypalServerSdkLib\PaypalServerSdkClientBuilder;
 use RuntimeException;
 use SonarSoftware\CustomerPortalFramework\Controllers\AccountBillingController;
 
 class PayPalController extends Controller
 {
     private $currency;
-    private $apiContext;
+    private PaypalServerSdkClient $client;
 
     /**
      * PayPalController constructor.
@@ -34,20 +40,16 @@ class PayPalController extends Controller
     {
         $this->currency = config("customer_portal.paypal_currency_code");
 
-        $this->apiContext = new ApiContext(
-            new OAuthTokenCredential(
-                config("customer_portal.paypal_api_client_id"),
-                config("customer_portal.paypal_api_client_secret")
+        $this->client = PaypalServerSdkClientBuilder::init()
+            ->clientCredentialsAuthCredentials(
+                ClientCredentialsAuthCredentialsBuilder::init(
+                    (string) config("customer_portal.paypal_api_client_id"),
+                    (string) config("customer_portal.paypal_api_client_secret")
+                )
             )
-        );
-
-        $this->apiContext->setConfig([
-            //You can set this to 'sandbox' if you want to test with a sandbox account
-            'mode' => 'live',
-            'log.LogEnabled' => true,
-            'log.FileName' => storage_path("logs/paypal.log"),
-            'log.LogLevel' => 'ERROR',
-        ]);
+            //You can set this to Environment::SANDBOX if you want to test with a sandbox account
+            ->environment(Environment::PRODUCTION)
+            ->build();
     }
 
     /**
@@ -63,34 +65,42 @@ class PayPalController extends Controller
 
         $amountToPay = number_format($amountToPay, 2, ".", "");
 
-        $payer = new Payer();
-        $payer->setPaymentMethod("paypal");
-
-        $amount = new Amount();
-        $amount->setCurrency($this->currency)
-            ->setTotal($amountToPay);
-        
-        $transaction = new Transaction();
-        $transaction->setAmount($amount)
-            ->setDescription(utrans("billing.paymentToCompany", ['company_name' => config("customer_portal.company_name")]))
-            ->setInvoiceNumber(uniqid(true)); //This is not a payment on a specific invoice, so we'll just generate a unique string, which is what PayPal requires
-
         $tempToken = new PaypalTemporaryToken(['account_id' => get_user()->accountId, 'token' => uniqid(true)]);
         $tempToken->save();
 
-        $redirectUrls = new RedirectUrls();
-        $redirectUrls->setReturnUrl(action("PayPalController@completePayment", ['temporary_token' => $tempToken->token]))
-            ->setCancelUrl(action("PayPalController@cancelPayment", ['temporary_token' => $tempToken->token]));
+        $purchaseUnit = PurchaseUnitRequestBuilder::init(
+                AmountWithBreakdownBuilder::init($this->currency, $amountToPay)->build()
+            )
+            ->description(utrans("billing.paymentToCompany", ['company_name' => config("customer_portal.company_name")]))
+            ->invoiceId(uniqid(true)) //This is not a payment on a specific invoice, so we'll just generate a unique string
+            ->build();
 
-        $payment = new Payment();
-        $payment->setIntent("sale")
-            ->setPayer($payer)
-            ->setRedirectUrls($redirectUrls)
-            ->setTransactions([$transaction]);
+        $experienceContext = PaypalWalletExperienceContextBuilder::init()
+            ->returnUrl(action("PayPalController@completePayment", ['temporary_token' => $tempToken->token]))
+            ->cancelUrl(action("PayPalController@cancelPayment", ['temporary_token' => $tempToken->token]))
+            ->userAction(PaypalExperienceUserAction::PAY_NOW)
+            ->build();
 
-        $payment->create($this->apiContext);
+        $orderRequest = OrderRequestBuilder::init(CheckoutPaymentIntent::CAPTURE, [$purchaseUnit])
+            ->paymentSource(
+                PaymentSourceBuilder::init()
+                    ->paypal(PaypalWalletBuilder::init()->experienceContext($experienceContext)->build())
+                    ->build()
+            )
+            ->build();
 
-        return $payment->getApprovalLink();
+        $response = $this->client->getOrdersController()->createOrder(['body' => $orderRequest]);
+        if (!$response->isSuccess()) {
+            throw new RuntimeException("PayPal order creation failed with HTTP status {$response->getStatusCode()}.");
+        }
+
+        foreach ($response->getResult()->getLinks() ?? [] as $link) {
+            if ($link->getRel() === 'payer-action') {
+                return $link->getHref();
+            }
+        }
+
+        throw new RuntimeException("PayPal order response did not include an approval link.");
     }
 
     /**
@@ -108,24 +118,26 @@ class PayPalController extends Controller
         }
         $token->delete();
 
-        if ($request->input('paymentId') === null || $request->input('PayerID') === null) {
+        // PayPal appends the order ID as "token" when redirecting back after approval.
+        if ($request->input('token') === null || $request->input('PayerID') === null) {
             $error = utrans("errors.missingPaypalInformation");
             return view("pages.paypal.error", compact('error'));
         }
 
-        $payment = Payment::get($request->input('paymentId'), $this->apiContext);
-        $execution = new PaymentExecution();
-        $execution->setPayerId($request->input('PayerID'));
-
         try {
-            $payment->execute($execution, $this->apiContext);
-            $payment = Payment::get($request->input('paymentId'), $this->apiContext);
+            $response = $this->client->getOrdersController()->captureOrder([
+                'id' => $request->input('token'),
+                'prefer' => 'return=representation',
+            ]);
         } catch (Exception $e) {
             $error = utrans("errors.paypalGenericError");
             return view("pages.paypal.error", compact('error'));
         }
-        
-        if (strtolower($payment->getState() != 'approved')) {
+
+        $order = $response->isSuccess() ? $response->getResult() : null;
+        $capture = $order?->getPurchaseUnits()[0]?->getPayments()?->getCaptures()[0] ?? null;
+
+        if ($order?->getStatus() !== OrderStatus::COMPLETED || $capture?->getStatus() !== CaptureStatus::COMPLETED) {
             $error = utrans("errors.paymentNotApproved");
             return view("pages.paypal.error", compact('error'));
         }
@@ -133,12 +145,12 @@ class PayPalController extends Controller
         //POST the payment back into Sonar for storage
         try {
             $accountBillingController = new AccountBillingController();
-            $transaction = $payment->getTransactions()[0];
-            $accountBillingController->storePayPalPayment(get_user()->accountId, $transaction->related_resources[0]->sale->amount->total, $transaction->related_resources[0]->sale->id);
+            $amount = $capture->getAmount()->getValue();
+            $accountBillingController->storePayPalPayment(get_user()->accountId, $amount, $capture->getId());
 
             event(new PaymentSuccessfullySubmittedEvent(new PaymentSubmission([
                 'account' => session('account'),
-                'amount' => \intval($transaction->related_resources[0]->sale->amount->total * 100),
+                'amount' => \intval(round($amount * 100)),
             ])));
         } catch (Exception $e) {
             $error = utrans("errors.failedToApplyPaypalPayment");
