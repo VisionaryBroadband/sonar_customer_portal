@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
-use Inacho\CreditCard as CreditCardValidator;
+use Freelancehunt\Validators\CreditCard as CreditCardValidator;
 use InvalidArgumentException;
 use SonarSoftware\CustomerPortalFramework\Controllers\AccountBillingController;
 use SonarSoftware\CustomerPortalFramework\Models\BankAccount;

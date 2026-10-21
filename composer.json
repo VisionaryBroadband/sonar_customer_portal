@@ -21,7 +21,7 @@
         "rdx/laravelcollective-html": "^6.10",
         "paypal/paypal-server-sdk": "^2.4",
         "proengsoft/laravel-jsvalidation": "^4.10",
-        "inacho/php-credit-card-validator": "^1.0",
+        "freelancehunt/php-credit-card-validator": "^3.0",
         "sonarsoftwareinc/customer_portal_framework": "dev-master",
         "spatie/laravel-csp": "^2.10.3",
         "gmostafa/php-graphql-client": "^1.13",
