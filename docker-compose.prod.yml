@@ -1,0 +1,24 @@
+# Production overrides: Traefik in front (TLS passthrough to nginx), certs managed manually.
+# Enable on the prod host by adding to .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+services:
+  app:
+    ports: !reset []
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.sonar.rule=HostSNI(`myaccount.vcn.com`)"
+      - "traefik.tcp.routers.sonar.entrypoints=websecure"
+      - "traefik.tcp.routers.sonar.tls.passthrough=true"
+      - "traefik.tcp.services.sonar.loadbalancer.server.port=443"
+    networks:
+      - traefik
+      - default
+
+  # certbot not in use, certs in ./data/certbot/conf are managed manually
+  certbot:
+    profiles: ["disabled"]
+
+networks:
+  traefik:
+    external: true
+    name: traefik
