@@ -31,7 +31,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/seankndy/customer_portal_framework"
+            "url": "https://github.com/VisionaryBroadband/sonar_customer_portal_framework"
         }
     ],
     "require-dev": {
